@@ -1,0 +1,190 @@
+package com.example.mysmartsensors;
+
+import android.content.Context;
+import android.graphics.Color;
+import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
+import android.hardware.SensorManager;
+import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.fragment.app.Fragment;
+
+import com.example.mysmartsensors.databinding.FragmentSensorGraphBinding;
+import com.github.mikephil.charting.components.YAxis;
+import com.github.mikephil.charting.data.Entry;
+import com.github.mikephil.charting.data.LineData;
+import com.github.mikephil.charting.data.LineDataSet;
+import com.github.mikephil.charting.interfaces.datasets.ILineDataSet;
+
+public class SensorGraphFragment extends Fragment implements SensorEventListener {
+
+    private static final String ARG_SENSOR_TYPE = "sensor_type";
+    private static final String ARG_TITLE = "title";
+    private static final String ARG_MODE = "mode";
+
+    private FragmentSensorGraphBinding binding;
+    private SensorManager sensorManager;
+    private Sensor sensor;
+
+    private int sensorType;
+    private String title;
+    private String mode; // "FIRST_VALUE" ou "MAGNITUDE"
+
+    // Pour la simulation sur émulateur
+    private final Handler simulationHandler = new Handler(Looper.getMainLooper());
+    private float simulationTime = 0f;
+
+    // Méthode pour instancier le fragment avec des paramètres
+    public static SensorGraphFragment newInstance(int sensorType, String title, String mode) {
+        SensorGraphFragment fragment = new SensorGraphFragment();
+        Bundle args = new Bundle();
+        args.putInt(ARG_SENSOR_TYPE, sensorType);
+        args.putString(ARG_TITLE, title);
+        args.putString(ARG_MODE, mode);
+        fragment.setArguments(args);
+        return fragment;
+    }
+
+    @Nullable
+    @Override
+    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
+        binding = FragmentSensorGraphBinding.inflate(inflater, container, false);
+
+        // Récupération des arguments
+        if (getArguments() != null) {
+            sensorType = getArguments().getInt(ARG_SENSOR_TYPE);
+            title = getArguments().getString(ARG_TITLE);
+            mode = getArguments().getString(ARG_MODE);
+        }
+
+        binding.textSensorTitle.setText(title);
+        setupChart();
+
+        sensorManager = (SensorManager) requireActivity().getSystemService(Context.SENSOR_SERVICE);
+        if (sensorManager != null) {
+            sensor = sensorManager.getDefaultSensor(sensorType);
+        }
+
+        return binding.getRoot();
+    }
+
+    // Configuration visuelle du graphique MPAndroidChart
+    private void setupChart() {
+        binding.lineChart.getDescription().setEnabled(false);
+        binding.lineChart.setTouchEnabled(true);
+        binding.lineChart.setDragEnabled(true);
+        binding.lineChart.setScaleEnabled(true);
+        binding.lineChart.setDrawGridBackground(false);
+
+        LineData data = new LineData();
+        binding.lineChart.setData(data);
+
+        YAxis rightAxis = binding.lineChart.getAxisRight();
+        rightAxis.setEnabled(false); // On désactive l'axe de droite pour un design plus épuré
+    }
+
+    private void addEntryToChart(float value) {
+        LineData data = binding.lineChart.getData();
+        if (data != null) {
+            ILineDataSet set = data.getDataSetByIndex(0);
+            if (set == null) {
+                LineDataSet lineDataSet = new LineDataSet(null, "Valeur en temps réel");
+                lineDataSet.setColor(Color.parseColor("#6200EE")); // Couleur de la ligne
+                lineDataSet.setLineWidth(2.5f);
+                lineDataSet.setDrawCircles(false);
+                lineDataSet.setDrawValues(false);
+                set = lineDataSet;
+                data.addDataSet(set);
+            }
+
+            data.addEntry(new Entry(set.getEntryCount(), value), 0);
+            data.notifyDataChanged();
+            binding.lineChart.notifyDataSetChanged();
+            binding.lineChart.setVisibleXRangeMaximum(50); // Garde les 50 dernières valeurs
+            binding.lineChart.moveViewToX(data.getEntryCount());
+        }
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        if (sensor != null) {
+            sensorManager.registerListener(this, sensor, SensorManager.SENSOR_DELAY_UI);
+        } else {
+            binding.textSensorValue.setText("Capteur physique absent.\nSimulation activée.");
+            startSimulation();
+        }
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        sensorManager.unregisterListener(this);
+        simulationHandler.removeCallbacksAndMessages(null);
+    }
+
+    @Override
+    public void onSensorChanged(SensorEvent event) {
+        float value = 0f;
+        if ("MAGNITUDE".equals(mode)) {
+            // Calcul de la norme pour les capteurs à 3 axes (comme le champ magnétique)
+            float x = event.values[0];
+            float y = event.values[1];
+            float z = event.values[2];
+            value = (float) Math.sqrt(x * x + y * y + z * z);
+        } else {
+            // Capteurs simples (Température, Humidité, Proximité)
+            value = event.values[0];
+        }
+
+        updateUI(value);
+    }
+
+    private void updateUI(float value) {
+        // Formatage pour n'afficher que 2 chiffres après la virgule
+        binding.textSensorValue.setText(String.format("Valeur : %.2f", value));
+        addEntryToChart(value);
+    }
+
+    @Override
+    public void onAccuracyChanged(Sensor sensor, int accuracy) {
+        // Non utilisé ici
+    }
+
+    // Simulation pour pouvoir tester sur l'émulateur
+    private void startSimulation() {
+        simulationHandler.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                simulationTime += 0.5f;
+                float simulatedValue = 0f;
+
+                if (sensorType == Sensor.TYPE_AMBIENT_TEMPERATURE) {
+                    simulatedValue = 22f + (float) Math.sin(simulationTime) * 2f;
+                } else if (sensorType == Sensor.TYPE_RELATIVE_HUMIDITY) {
+                    simulatedValue = 45f + (float) Math.cos(simulationTime) * 5f;
+                } else if (sensorType == Sensor.TYPE_PROXIMITY) {
+                    simulatedValue = (simulationTime % 4 < 2) ? 0f : 5f; // Alterne proche/loin
+                } else if (sensorType == Sensor.TYPE_MAGNETIC_FIELD) {
+                    simulatedValue = 45f + (float) Math.sin(simulationTime * 2) * 15f;
+                }
+
+                updateUI(simulatedValue);
+                simulationHandler.postDelayed(this, 500); // Mise à jour toutes les 500ms
+            }
+        }, 500);
+    }
+
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        binding = null;
+    }
+}

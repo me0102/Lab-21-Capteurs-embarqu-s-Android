@@ -1,0 +1,144 @@
+package com.example.mysmartsensors;
+
+import android.content.Context;
+import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
+import android.hardware.SensorManager;
+import android.os.Bundle;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.fragment.app.Fragment;
+
+import com.example.mysmartsensors.databinding.FragmentActivityRecognitionBinding;
+
+import java.util.LinkedList;
+import java.util.Queue;
+
+public class ActivityRecognitionFragment extends Fragment implements SensorEventListener {
+
+    private FragmentActivityRecognitionBinding binding;
+    private SensorManager sensorManager;
+    private Sensor accelerometer;
+
+    // Variables pour l'algorithme de détection
+    private final float[] gravity = new float[3];
+    private final Queue<Float> movementWindow = new LinkedList<>();
+
+    private static final int WINDOW_SIZE = 30;
+    private static final float ALPHA = 0.85f; // Filtre passe-bas (personnalisé)
+
+    @Nullable
+    @Override
+    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
+        binding = FragmentActivityRecognitionBinding.inflate(inflater, container, false);
+
+        sensorManager = (SensorManager) requireActivity().getSystemService(Context.SENSOR_SERVICE);
+        if (sensorManager != null) {
+            accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
+        }
+
+        return binding.getRoot();
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        if (accelerometer != null) {
+            // SENSOR_DELAY_GAME permet d'avoir assez de données pour l'analyse
+            sensorManager.registerListener(this, accelerometer, SensorManager.SENSOR_DELAY_GAME);
+        } else {
+            binding.textCurrentActivity.setText("Accéléromètre non trouvé");
+        }
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        sensorManager.unregisterListener(this);
+    }
+
+    @Override
+    public void onSensorChanged(SensorEvent event) {
+        float x = event.values[0];
+        float y = event.values[1];
+        float z = event.values[2];
+
+        // 1. Isoler la gravité grâce au filtre passe-bas
+        gravity[0] = ALPHA * gravity[0] + (1 - ALPHA) * x;
+        gravity[1] = ALPHA * gravity[1] + (1 - ALPHA) * y;
+        gravity[2] = ALPHA * gravity[2] + (1 - ALPHA) * z;
+
+        // 2. Retirer la gravité pour obtenir l'accélération linéaire (le vrai mouvement)
+        float linearX = x - gravity[0];
+        float linearY = y - gravity[1];
+        float linearZ = z - gravity[2];
+
+        // 3. Calculer l'intensité globale du mouvement
+        float movementIntensity = (float) Math.sqrt(linearX * linearX + linearY * linearY + linearZ * linearZ);
+
+        // 4. Mettre à jour la fenêtre glissante
+        if (movementWindow.size() >= WINDOW_SIZE) {
+            movementWindow.poll();
+        }
+        movementWindow.add(movementIntensity);
+
+        // 5. Analyser et mettre à jour l'interface
+        String detectedActivity = classifyActivity(x, y, z);
+
+        binding.textRawData.setText(String.format("X: %.2f | Y: %.2f | Z: %.2f", x, y, z));
+        binding.textMovementIntensity.setText(String.format("Intensité sans gravité : %.2f", movementIntensity));
+        binding.textCurrentActivity.setText(detectedActivity);
+    }
+
+    private String classifyActivity(float x, float y, float z) {
+        if (movementWindow.size() < WINDOW_SIZE) {
+            return "Calibration...";
+        }
+
+        float sum = 0f;
+        float max = 0f;
+
+        for (float value : movementWindow) {
+            sum += value;
+            max = Math.max(max, value);
+        }
+
+        float mean = sum / movementWindow.size();
+        float varianceSum = 0f;
+
+        for (float value : movementWindow) {
+            varianceSum += (value - mean) * (value - mean);
+        }
+
+        float standardDeviation = (float) Math.sqrt(varianceSum / movementWindow.size());
+
+        // Logique de classification basée sur des seuils
+        if (max > 12f) {
+            return "Saut ou Choc !";
+        }
+        if (standardDeviation > 1.5f) {
+            return "Marche";
+        }
+        if (Math.abs(z) > 8f && standardDeviation < 0.5f) {
+            return "Téléphone posé à plat";
+        }
+        if ((Math.abs(y) > 7f || Math.abs(x) > 7f) && standardDeviation < 0.5f) {
+            return "Stable (En main / Assis)";
+        }
+
+        return "Mouvement léger";
+    }
+
+    @Override
+    public void onAccuracyChanged(Sensor sensor, int accuracy) {}
+
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        binding = null;
+    }
+}

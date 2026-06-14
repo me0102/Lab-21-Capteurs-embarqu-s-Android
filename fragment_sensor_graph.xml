@@ -1,0 +1,154 @@
+package com.example.mysmartsensors;
+
+import android.content.Context;
+import android.graphics.Color;
+import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
+import android.hardware.SensorManager;
+import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.fragment.app.Fragment;
+
+import com.example.mysmartsensors.databinding.FragmentMotionSensorBinding;
+import com.github.mikephil.charting.components.YAxis;
+import com.github.mikephil.charting.data.Entry;
+import com.github.mikephil.charting.data.LineData;
+import com.github.mikephil.charting.data.LineDataSet;
+import com.github.mikephil.charting.interfaces.datasets.ILineDataSet;
+
+public class MotionSensorFragment extends Fragment implements SensorEventListener {
+
+    private static final String ARG_SENSOR_TYPE = "sensor_type";
+    private static final String ARG_TITLE = "title";
+
+    private FragmentMotionSensorBinding binding;
+    private SensorManager sensorManager;
+    private Sensor sensor;
+    private int sensorType;
+
+    private final Handler simulationHandler = new Handler(Looper.getMainLooper());
+    private float simulationTime = 0f;
+
+    public static MotionSensorFragment newInstance(int sensorType, String title) {
+        MotionSensorFragment fragment = new MotionSensorFragment();
+        Bundle args = new Bundle();
+        args.putInt(ARG_SENSOR_TYPE, sensorType);
+        args.putString(ARG_TITLE, title);
+        fragment.setArguments(args);
+        return fragment;
+    }
+
+    @Nullable
+    @Override
+    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
+        binding = FragmentMotionSensorBinding.inflate(inflater, container, false);
+
+        if (getArguments() != null) {
+            sensorType = getArguments().getInt(ARG_SENSOR_TYPE);
+            binding.textMotionTitle.setText(getArguments().getString(ARG_TITLE));
+        }
+
+        setupChart();
+
+        sensorManager = (SensorManager) requireActivity().getSystemService(Context.SENSOR_SERVICE);
+        if (sensorManager != null) {
+            sensor = sensorManager.getDefaultSensor(sensorType);
+        }
+
+        return binding.getRoot();
+    }
+
+    private void setupChart() {
+        binding.motionChart.getDescription().setEnabled(false);
+        binding.motionChart.setDrawGridBackground(false);
+        LineData data = new LineData();
+        binding.motionChart.setData(data);
+        binding.motionChart.getAxisRight().setEnabled(false);
+    }
+
+    private void addEntryToChart(float magnitude) {
+        LineData data = binding.motionChart.getData();
+        if (data != null) {
+            ILineDataSet set = data.getDataSetByIndex(0);
+            if (set == null) {
+                LineDataSet lineDataSet = new LineDataSet(null, "Intensité (Norme)");
+                lineDataSet.setColor(Color.parseColor("#FF9800"));
+                lineDataSet.setLineWidth(2.5f);
+                lineDataSet.setDrawCircles(false);
+                lineDataSet.setDrawValues(false);
+                set = lineDataSet;
+                data.addDataSet(set);
+            }
+            data.addEntry(new Entry(set.getEntryCount(), magnitude), 0);
+            data.notifyDataChanged();
+            binding.motionChart.notifyDataSetChanged();
+            binding.motionChart.setVisibleXRangeMaximum(50);
+            binding.motionChart.moveViewToX(data.getEntryCount());
+        }
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        if (sensor != null) {
+            sensorManager.registerListener(this, sensor, SensorManager.SENSOR_DELAY_UI);
+        } else {
+            startSimulation();
+        }
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        sensorManager.unregisterListener(this);
+        simulationHandler.removeCallbacksAndMessages(null);
+    }
+
+    @Override
+    public void onSensorChanged(SensorEvent event) {
+        updateUI(event.values[0], event.values[1], event.values[2]);
+    }
+
+    private void updateUI(float x, float y, float z) {
+        float magnitude = (float) Math.sqrt(x * x + y * y + z * z);
+
+        binding.textValueX.setText(String.format("X : %.2f", x));
+        binding.textValueY.setText(String.format("Y : %.2f", y));
+        binding.textValueZ.setText(String.format("Z : %.2f", z));
+        binding.textValueNorm.setText(String.format("Norme globale : %.2f", magnitude));
+
+        addEntryToChart(magnitude);
+    }
+
+    @Override
+    public void onAccuracyChanged(Sensor sensor, int accuracy) {}
+
+    private void startSimulation() {
+        simulationHandler.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                simulationTime += 0.5f;
+                // Simulation de légers mouvements du téléphone
+                float simX = (float) Math.sin(simulationTime) * 2f;
+                float simY = (float) Math.cos(simulationTime * 1.5f) * 3f;
+                float simZ = 9.81f + (float) Math.sin(simulationTime * 0.5f); // 9.81 simule la gravité terrestre
+
+                updateUI(simX, simY, simZ);
+                simulationHandler.postDelayed(this, 300);
+            }
+        }, 300);
+    }
+
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        binding = null;
+    }
+}

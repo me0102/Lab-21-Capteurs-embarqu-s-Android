@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="24dp"
+    android:background="#F5F5F5">
+
+    <TextView
+        android:id="@+id/textMotionTitle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Titre du capteur"
+        android:textSize="22sp"
+        android:textStyle="bold"
+        android:textColor="@android:color/black"
+        android:layout_marginBottom="16dp"/>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:weightSum="3"
+        android:layout_marginBottom="8dp">
+
+        <TextView android:id="@+id/textValueX" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="X : 0.0" android:textColor="#D32F2F" android:textStyle="bold"/>
+        <TextView android:id="@+id/textValueY" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="Y : 0.0" android:textColor="#388E3C" android:textStyle="bold"/>
+        <TextView android:id="@+id/textValueZ" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="Z : 0.0" android:textColor="#1976D2" android:textStyle="bold"/>
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/textValueNorm"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Norme globale : 0.0"
+        android:textSize="16sp"
+        android:textColor="#555555"
+        android:layout_marginBottom="24dp"/>
+
+    <com.github.mikephil.charting.charts.LineChart
+        android:id="@+id/motionChart"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+</LinearLayout>

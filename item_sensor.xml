@@ -1,0 +1,62 @@
+package com.example.mysmartsensors;
+
+import android.hardware.Sensor;
+import android.view.LayoutInflater;
+import android.view.ViewGroup;
+import androidx.annotation.NonNull;
+import androidx.recyclerview.widget.RecyclerView;
+import com.example.mysmartsensors.databinding.ItemSensorBinding;
+import java.util.List;
+
+public class SensorsAdapter extends RecyclerView.Adapter<SensorsAdapter.SensorViewHolder> {
+
+    private final List<Sensor> sensorList;
+
+    public SensorsAdapter(List<Sensor> sensorList) {
+        this.sensorList = sensorList;
+    }
+
+    @NonNull
+    @Override
+    public SensorViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+        // On "gonfle" (inflate) le design item_sensor.xml grâce au ViewBinding
+        ItemSensorBinding binding = ItemSensorBinding.inflate(LayoutInflater.from(parent.getContext()), parent, false);
+        return new SensorViewHolder(binding);
+    }
+
+    @Override
+    public void onBindViewHolder(@NonNull SensorViewHolder holder, int position) {
+        Sensor currentSensor = sensorList.get(position);
+
+        // Le nom du capteur en gras
+        holder.binding.textSensorName.setText(currentSensor.getName());
+
+        // Le formatage des détails techniques demandé dans le TP
+        String details = "Id : " + currentSensor.getId() + "\n"
+                + "Vendor : " + currentSensor.getVendor() + "\n"
+                + "Version : " + currentSensor.getVersion() + "\n"
+                + "Type : " + currentSensor.getStringType() + "\n"
+                + "Int Type : " + currentSensor.getType() + "\n"
+                + "Resolution : " + currentSensor.getResolution() + "\n"
+                + "Power : " + currentSensor.getPower() + " mA\n"
+                + "Maximum Range : " + currentSensor.getMaximumRange() + "\n"
+                + "Min Delay : " + currentSensor.getMinDelay() + " µs";
+
+        holder.binding.textSensorDetails.setText(details);
+    }
+
+    @Override
+    public int getItemCount() {
+        return sensorList.size();
+    }
+
+    // Le ViewHolder garde les références vers les éléments visuels de la carte
+    static class SensorViewHolder extends RecyclerView.ViewHolder {
+        final ItemSensorBinding binding;
+
+        SensorViewHolder(ItemSensorBinding binding) {
+            super(binding.getRoot());
+            this.binding = binding;
+        }
+    }
+}

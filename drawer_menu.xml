@@ -1,0 +1,52 @@
+package com.example.mysmartsensors;
+
+import android.content.Context;
+import android.hardware.Sensor;
+import android.hardware.SensorManager;
+import android.os.Bundle;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.fragment.app.Fragment;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import com.example.mysmartsensors.databinding.FragmentSensorsListBinding;
+import java.util.List;
+
+public class SensorsListFragment extends Fragment {
+
+    private FragmentSensorsListBinding binding;
+
+    @Nullable
+    @Override
+    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
+        binding = FragmentSensorsListBinding.inflate(inflater, container, false);
+        return binding.getRoot();
+    }
+
+    @Override
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
+
+        // 1. Récupération du SensorManager
+        SensorManager sensorManager = (SensorManager) requireActivity().getSystemService(Context.SENSOR_SERVICE);
+
+        if (sensorManager != null) {
+            // 2. Récupération de la liste de tous les capteurs
+            List<Sensor> deviceSensors = sensorManager.getSensorList(Sensor.TYPE_ALL);
+
+            // 3. Configuration du RecyclerView avec notre Adapter
+            SensorsAdapter adapter = new SensorsAdapter(deviceSensors);
+            binding.recyclerViewSensors.setLayoutManager(new LinearLayoutManager(requireContext()));
+            binding.recyclerViewSensors.setAdapter(adapter);
+        }
+    }
+
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        // Bonne pratique pour éviter les fuites de mémoire avec le ViewBinding
+        binding = null;
+    }
+}
